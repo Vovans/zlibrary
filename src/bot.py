@@ -31,27 +31,29 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
         messages = []
         reply = ""
         max_length = 4000  # Telegram's limit is 4096, leaving margin
+        books_per_message = 3  # Reduce books per message
 
         for i, book_item in enumerate(paginator.result, start=1):
             book = await book_item.fetch()
-            title = book.get("name", "Unknown")[:100]  # Truncate if too long
+            title = book.get("name", "Unknown")[:100]
             authors = book.get("authors", [])
-            author_names = ", ".join([author.get("author", "Unknown")[:30] for author in authors]) if authors else "Unknown Author"  # Extract author names correctly
-            format_type = book.get("extension", "Unknown")  # Define format_type properly
+            author_names = ", ".join([author.get("author", "Unknown")[:30] for author in authors]) if isinstance(authors, list) else "Unknown Author"
+            format_type = book.get("extension", "Unknown")
             download_link = book.get("download_url", "Unavailable")
 
             entry = f"{i}. {title}\nAuthor(s): {author_names}\nFormat: {format_type}\nDownload: {download_link}\n\n"
 
-            if len(reply) + len(entry) > max_length:
-                messages.append(reply)
-                reply = entry
-            else:
-                reply += entry
+        if len(reply) + len(entry) > max_length or (i % books_per_message == 0):
+            messages.append(reply)
+            reply = entry
+        else:
+            reply += entry
 
-        messages.append(reply)  # Add final message block
+        if reply.strip():  # Ensure last message is not empty
+            messages.append(reply)
 
         for msg in messages:
-            if msg.strip():  # Ensure message is not empty
+            if msg.strip():  # Send only non-empty messages
                 await update.message.reply_text(msg)
 
 async def zlib_login():
