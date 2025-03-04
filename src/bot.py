@@ -30,7 +30,7 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if paginator.result:
         messages = []
         reply = ""
-        max_length = 4000  # Telegram's limit is 4096, leaving margin
+        max_length = 3000 # Telegram's limit is 4096, leaving margin
         books_per_message = 3  # Reduce books per message
 
         for i, book_item in enumerate(paginator.result, start=1):
