@@ -28,21 +28,30 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await paginator.next()
 
     if paginator.result:
+        messages = []
         reply = ""
+        max_length = 4000  # Telegram's limit is 4096, leaving margin
+
         for i, book_item in enumerate(paginator.result, start=1):
             book = await book_item.fetch()
-            reply += f"{i}. Title: {book.get('name')}\n"
-            
+            title = book.get("name", "Unknown")[:100]  # Truncate if too long
             authors = book.get("authors", [])
-            if authors:
-                author_names = ", ".join([author["author"] for author in authors])
-                reply += f"Authors: {author_names}\n"
+            author_names = ", ".join([author["author"][:30] for author in authors])  # Limit author name length
+            format_type = book.get("extension", "Unknown")
+            download_link = book.get("download_url", "Unavailable")
 
-            reply += f"Format: {book.get('extension', 'Unknown')}\n"
-            reply += f"Download: {book.get('download_url', 'Unavailable')}\n\n"
-        await update.message.reply_text(reply)
-    else:
-        await update.message.reply_text("No results found.")
+            entry = f"{i}. {title}\nFormat: {format_type}\nDownload: {download_link}\n\n"
+
+            if len(reply) + len(entry) > max_length:
+                messages.append(reply)
+                reply = entry
+            else:
+                reply += entry
+
+        messages.append(reply)  # Add final message block
+
+        for msg in messages:
+            await update.message.reply_text(msg)
 
 async def zlib_login():
     """Handle the asynchronous login for zlibrary."""
