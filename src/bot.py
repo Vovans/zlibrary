@@ -1,5 +1,6 @@
 import os
 import asyncio
+import logging
 from zlibrary import AsyncZlib
 from telegram import Update
 from telegram.ext import (
@@ -9,6 +10,8 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+
+logging.basicConfig(filename="zlibrary_bot.log", level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
