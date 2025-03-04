@@ -32,18 +32,14 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for i, book_item in enumerate(paginator.result, start=1):
             book = await book_item.fetch()
             reply += f"{i}. Title: {book.get('name')}\n"
+            
             authors = book.get("authors", [])
             if authors:
                 author_names = ", ".join([author["author"] for author in authors])
                 reply += f"Authors: {author_names}\n"
-            if "extension" in book:
-                reply += f"Format: {book.get('extension')}\n"
 
-            if "download_url" in book:
-                reply += f"Download: {book.get('download_url')}\n"
-            else:
-                reply += "Download link unavailable.\n"
-            reply += "\n"
+            reply += f"Format: {book.get('extension', 'Unknown')}\n"
+            reply += f"Download: {book.get('download_url', 'Unavailable')}\n\n"
         await update.message.reply_text(reply)
     else:
         await update.message.reply_text("No results found.")
