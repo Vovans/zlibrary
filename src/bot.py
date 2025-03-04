@@ -55,14 +55,16 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     messages.append(reply)
                     print(f"DEBUG: Sending message of length: {len(reply)}")  # Log sent message length
                     await update.message.reply_text(reply)  # Send message immediately
-                reply = ""  # Reset buffer
-        
-            reply += entry  # Add new entry to reply buffer
+                reply = entry  # Start new buffer with current entry
+            else:
+                reply += entry  # Add new entry to reply buffer
 
         # Ensure last accumulated message is sent
         if reply.strip():
             messages.append(reply)
             await update.message.reply_text(reply)
+        elif not messages:
+            await update.message.reply_text("No results found.")  # Ensure a response is always sent
 
 async def zlib_login():
     """Handle the asynchronous login for zlibrary."""
