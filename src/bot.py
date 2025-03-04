@@ -42,10 +42,13 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             download_link = book.get("download_url", "Unavailable")
 
             entry = f"{i}. {title}\nAuthor(s): {author_names}\nFormat: {format_type}\nDownload: {download_link}\n\n"
-
+            
+            print(f"DEBUG: Entry length: {len(entry)}")
+            print(f"DEBUG: Current reply length: {len(reply)}")
             if len(reply) + len(entry) > max_length or (i % books_per_message == 0):
                 if reply.strip():  # Ensure reply contains valid content
                     messages.append(reply)
+                    print(f"DEBUG: Sending message of length: {len(reply)}")  # Log sent message length
                     await update.message.reply_text(reply)  # Send message immediately
                 reply = ""  # Reset buffer
         
