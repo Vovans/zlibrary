@@ -44,6 +44,10 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             author_names = authors[0].get("author", "Unknown") if isinstance(authors, list) and authors else "Unknown Author"
             logging.debug(f"Extracted author names before trimming: {author_names}")           
             format_type = book.get("extension", "Unknown")
+            # Verify authentication before retrieving download link
+            if not context.application.zlib or not context.application.zlib.cookies:
+                logging.error("Z-Library session is not authenticated! Ensure login credentials are set.")
+            
             # Attempt to follow redirect to get final download URL
             original_url = book.get("download_url", "Unavailable")
             final_url = original_url  # Default to original URL if redirect fails
@@ -52,11 +56,16 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logging.debug(f"Following redirect for: {original_url}")
                 try:
                     response = await context.application.zlib._r(original_url)  # Await response object
-                    if response.status == 200:
-                        final_url = str(response.url)  # Extract final redirected URL
+                    logging.debug(f"Received response status: {response.status}")
+
+                    if response.status in [301, 302, 303, 307, 308]:  # Handle redirects
+                        final_url = str(response.headers.get("Location", response.url))
                         logging.debug(f"Resolved final redirect URL: {final_url}")
+                    elif response.status == 200:
+                        final_url = str(response.url)  # Final URL for direct downloads
+                        logging.debug(f"Final download URL resolved: {final_url}")
                     else:
-                        logging.warning(f"Unexpected status {response.status} when following redirect.")
+                        logging.warning(f"Unexpected response when following redirect: {response.status}")
                 except Exception as e:
                     logging.error(f"Failed to retrieve final URL: {e}")
 
