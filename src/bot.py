@@ -44,17 +44,16 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             entry = f"{i}. {title}\nAuthor(s): {author_names}\nFormat: {format_type}\nDownload: {download_link}\n\n"
 
         if len(reply) + len(entry) > max_length or (i % books_per_message == 0):
-            messages.append(reply)
-            reply = entry
+            if reply.strip():  # Ensure reply is not empty before sending
+                messages.append(reply)
+                await update.message.reply_text(reply)
+            reply = entry  # Start a new message batch
         else:
             reply += entry
 
-        if reply.strip():  # Ensure last message is not empty
-            messages.append(reply)
-
-        for msg in messages:
-            if msg.strip():  # Send only non-empty messages
-                await update.message.reply_text(msg)
+        # Send the last message after processing all loops
+        if reply.strip():
+            await update.message.reply_text(reply)
 
 async def zlib_login():
     """Handle the asynchronous login for zlibrary."""
