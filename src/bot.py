@@ -47,13 +47,16 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if reply.strip():  # Ensure reply is not empty before sending
                 messages.append(reply)
                 await update.message.reply_text(reply)
-            reply = entry  # Start a new message batch
-        else:
-            reply += entry
+            reply = ""  # Reset reply after sending
+    
+        reply += entry  # Append new entry
 
-        # Send the last message after processing all loops
+        # Send remaining messages in the list
         if reply.strip():
-            await update.message.reply_text(reply)
+            messages.append(reply)
+
+        for msg in messages:
+            await update.message.reply_text(msg)
 
 async def zlib_login():
     """Handle the asynchronous login for zlibrary."""
