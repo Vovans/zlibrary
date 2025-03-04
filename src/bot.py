@@ -40,16 +40,19 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             book = await book_item.fetch()
             title = book.get("name", "Unknown")[:100]
             authors = book.get("authors", [])
+            logging.debug(f"Raw authors data: {authors}")
             author_names = ", ".join(
                 [author.get("author", "Unknown").split("comments")[0].split(",")[0].strip()[:40] for author in authors if isinstance(author, dict) and "author" in author]
-                ) if isinstance(authors, list) else "Unknown Author"           
+                ) if isinstance(authors, list) else "Unknown Author"
+            logging.debug(f"Extracted author names before trimming: {author_names}")           
             format_type = book.get("extension", "Unknown")
             download_link = book.get("download_url", "Unavailable")
 
             entry = f"{i}. {title}\nAuthor(s): {author_names}\nFormat: {format_type}\nDownload: {download_link}\n\n"
             
-            print(f"DEBUG: Entry length: {len(entry)}")
-            print(f"DEBUG: Current reply length: {len(reply)}")
+            logging.debug(f"DEBUG Entry content: {entry}")
+            logging.debug(f"DEBUG Entry length: {len(entry)}")
+            logging.debug(f"DEBUG Current reply length: {len(reply)}")
             if len(reply) + len(entry) > max_length or (i % books_per_message == 0):
                 if reply.strip():  # Ensure reply contains valid content
                     messages.append(reply)
@@ -61,6 +64,7 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Ensure last accumulated message is sent
         if reply.strip():
+            logging.debug(f"DEBUG Final message being sent: {reply}")
             messages.append(reply)
             await update.message.reply_text(reply)
         elif not messages:
