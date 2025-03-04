@@ -47,8 +47,8 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Attempt to follow redirect to get final download URL
             original_url = book.get("download_url", "Unavailable")
             if original_url.startswith("https://z-library.sk/dl/"):
-                async with context.application.zlib._r(original_url) as response:
-                    final_url = response.url if response.status == 200 else original_url
+                response = await context.application.zlib._r(original_url)
+                final_url = str(response.url) if response else original_url
             else:
                 final_url = original_url
             
