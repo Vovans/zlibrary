@@ -41,8 +41,8 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             title = book.get("name", "Unknown")[:100]
             authors = book.get("authors", [])
             author_names = ", ".join(
-                [author.get("author", "Unknown").split("comments")[0].strip()[:30] for author in authors if isinstance(author, dict) and "author" in author]
-                ) if isinstance(authors, list) else "Unknown Author"            
+                [author.get("author", "Unknown").split("comments")[0].split(",")[0].strip()[:40] for author in authors if isinstance(author, dict) and "author" in author]
+                ) if isinstance(authors, list) else "Unknown Author"           
             format_type = book.get("extension", "Unknown")
             download_link = book.get("download_url", "Unavailable")
 
