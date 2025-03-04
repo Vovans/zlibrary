@@ -30,8 +30,8 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if paginator.result:
         messages = []
         reply = ""
-        max_length = 3000 # Telegram's limit is 4096, leaving margin
-        books_per_message = 3  # Reduce books per message
+        max_length = 3000  # Telegram's limit is 4096, leaving margin
+        books_per_message = 3  # Max books in one message
 
         for i, book_item in enumerate(paginator.result, start=1):
             book = await book_item.fetch()
@@ -43,20 +43,18 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             entry = f"{i}. {title}\nAuthor(s): {author_names}\nFormat: {format_type}\nDownload: {download_link}\n\n"
 
-        if len(reply) + len(entry) > max_length or (i % books_per_message == 0):
-            if reply.strip():  # Ensure reply is not empty before sending
-                messages.append(reply)
-                await update.message.reply_text(reply)
-            reply = ""  # Reset reply after sending
-    
-        reply += entry  # Append new entry
+            if len(reply) + len(entry) > max_length or (i % books_per_message == 0):
+                if reply.strip():  # Ensure reply contains valid content
+                    messages.append(reply)
+                    await update.message.reply_text(reply)  # Send message immediately
+                reply = ""  # Reset buffer
+        
+            reply += entry  # Add new entry to reply buffer
 
-        # Send remaining messages in the list
+        # Ensure last accumulated message is sent
         if reply.strip():
             messages.append(reply)
-
-        for msg in messages:
-            await update.message.reply_text(msg)
+            await update.message.reply_text(reply)
 
 async def zlib_login():
     """Handle the asynchronous login for zlibrary."""
