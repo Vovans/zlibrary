@@ -46,15 +46,21 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             format_type = book.get("extension", "Unknown")
             # Attempt to follow redirect to get final download URL
             original_url = book.get("download_url", "Unavailable")
+            final_url = original_url  # Default to original URL if redirect fails
+
             if original_url.startswith("https://z-library.sk/dl/"):
                 logging.debug(f"Following redirect for: {original_url}")
-                response = await context.application.zlib._r(original_url)
-                if response and response.status == 200:
-                    final_url = str(response.url)
-                    logging.debug(f"Final redirect URL: {final_url}")
-                else:
-                    logging.warning(f"Failed to retrieve final URL, using original: {original_url}")
-                    final_url = original_url
+                try:
+                    async with context.application.zlib._r(original_url) as response:
+                        if response.status == 200:
+                            final_url = str(response.real_url)  # Extract final redirected URL
+                            logging.debug(f"Resolved final redirect URL: {final_url}")
+                        else:
+                            logging.warning(f"Unexpected status {response.status} when following redirect.")
+                except Exception as e:
+                    logging.error(f"Failed to retrieve final URL: {e}")
+
+            logging.debug(f"Using final download URL: {final_url}")
             
             logging.debug(f"Resolved final download URL: {final_url}")
             download_link = final_url
