@@ -44,7 +44,15 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             author_names = authors[0].get("author", "Unknown") if isinstance(authors, list) and authors else "Unknown Author"
             logging.debug(f"Extracted author names before trimming: {author_names}")           
             format_type = book.get("extension", "Unknown")
-            download_link = book.get("download_url", "Unavailable")
+            # Attempt to follow redirect to get final download URL
+            original_url = book.get("download_url", "Unavailable")
+            if original_url.startswith("https://z-library.sk/dl/"):
+                async with context.application.zlib._r(original_url) as response:
+                    final_url = response.url if response.status == 200 else original_url
+            else:
+                final_url = original_url
+            
+            download_link = final_url
 
             entry = f"{i}. {title}\nAuthor(s): {author_names}\nFormat: {format_type}\nDownload: {download_link}\n\n"
             
