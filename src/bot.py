@@ -58,16 +58,17 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     response = await context.application.zlib._r(original_url)  # Await response object
                     logging.debug(f"Received response status: {response.status}")
 
-                    if response.status in [301, 302, 303, 307, 308]:  # Handle redirects
-                        final_url = str(response.headers.get("Location", response.url))
-                        logging.debug(f"Resolved final redirect URL: {final_url}")
-                    elif response.status == 200:
-                        final_url = str(response.url)  # Final URL for direct downloads
-                        logging.debug(f"Final download URL resolved: {final_url}")
+                    # Extract final URL directly without unnecessary decoding
+                    final_url = str(response.url)
+
+                    if response.history:  # Check if redirects happened
+                        logging.debug(f"Final redirect resolved URL: {final_url}")
                     else:
-                        logging.warning(f"Unexpected response when following redirect: {response.status}")
+                        logging.warning(f"No redirects detected; using original URL: {final_url}")
+
                 except Exception as e:
                     logging.error(f"Failed to retrieve final URL: {e}")
+                    final_url = original_url  # Fallback to original URL
 
             logging.debug(f"Using final download URL: {final_url}")
             
