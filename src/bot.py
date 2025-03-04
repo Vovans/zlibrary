@@ -36,11 +36,11 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             book = await book_item.fetch()
             title = book.get("name", "Unknown")[:100]  # Truncate if too long
             authors = book.get("authors", [])
-            author_names = ", ".join([author["author"][:30] for author in authors])  # Limit author name length
+            author_names = ", ".join([author[:30] for author in authors]) if authors else "Unknown Author"  # Ensure authors are displayed correctly
             format_type = book.get("extension", "Unknown")
             download_link = book.get("download_url", "Unavailable")
 
-            entry = f"{i}. {title}\nFormat: {format_type}\nDownload: {download_link}\n\n"
+            entry = f"{i}. {title}\nAuthor(s): {author_names}\nFormat: {format_type}\nDownload: {download_link}\n\n"
 
             if len(reply) + len(entry) > max_length:
                 messages.append(reply)
