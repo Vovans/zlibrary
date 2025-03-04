@@ -30,7 +30,7 @@ async def GET_request(url, cookies=None, proxy_list=None) -> str:
         ) as sess:
             logger.info("GET %s" % url)
             async with sess.get(url) as resp:
-                return await resp.text()
+                return await resp
     except asyncio.exceptions.CancelledError:
         raise LoopError("Asyncio loop has been closed before request could finish.")
 
