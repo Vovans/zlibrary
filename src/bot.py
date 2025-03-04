@@ -51,12 +51,12 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if original_url.startswith("https://z-library.sk/dl/"):
                 logging.debug(f"Following redirect for: {original_url}")
                 try:
-                    async with context.application.zlib._r(original_url) as response:
-                        if response.status == 200:
-                            final_url = str(response.real_url)  # Extract final redirected URL
-                            logging.debug(f"Resolved final redirect URL: {final_url}")
-                        else:
-                            logging.warning(f"Unexpected status {response.status} when following redirect.")
+                    response = await context.application.zlib._r(original_url)  # Await response object
+                    if response.status == 200:
+                        final_url = str(response.url)  # Extract final redirected URL
+                        logging.debug(f"Resolved final redirect URL: {final_url}")
+                    else:
+                        logging.warning(f"Unexpected status {response.status} when following redirect.")
                 except Exception as e:
                     logging.error(f"Failed to retrieve final URL: {e}")
 
