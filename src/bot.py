@@ -51,7 +51,8 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
         messages.append(reply)  # Add final message block
 
         for msg in messages:
-            await update.message.reply_text(msg)
+            if msg.strip():  # Ensure message is not empty
+                await update.message.reply_text(msg)
 
 async def zlib_login():
     """Handle the asynchronous login for zlibrary."""
