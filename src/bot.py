@@ -36,7 +36,8 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             book = await book_item.fetch()
             title = book.get("name", "Unknown")[:100]  # Truncate if too long
             authors = book.get("authors", [])
-            author_names = ", ".join([author.get("author", "Unknown")[:30] for author in authors]) if authors else "Unknown Author"  # Extract author names correctly            format_type = book.get("extension", "Unknown")
+            author_names = ", ".join([author.get("author", "Unknown")[:30] for author in authors]) if authors else "Unknown Author"  # Extract author names correctly
+            format_type = book.get("extension", "Unknown")  # Define format_type properly
             download_link = book.get("download_url", "Unavailable")
 
             entry = f"{i}. {title}\nAuthor(s): {author_names}\nFormat: {format_type}\nDownload: {download_link}\n\n"
