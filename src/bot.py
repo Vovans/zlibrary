@@ -48,10 +48,11 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             original_url = book.get("download_url", "Unavailable")
             if original_url.startswith("https://z-library.sk/dl/"):
                 response = await context.application.zlib._r(original_url)
-                final_url = str(response.url) if response else original_url
+                final_url = str(response.url) if response and response.status == 200 else original_url
             else:
                 final_url = original_url
             
+            logging.debug(f"Resolved final download URL: {final_url}")
             download_link = final_url
 
             entry = f"{i}. {title}\nAuthor(s): {author_names}\nFormat: {format_type}\nDownload: {download_link}\n\n"
