@@ -11,7 +11,11 @@ from telegram.ext import (
     filters,
 )
 
-logging.basicConfig(filename="zlibrary_bot.log", level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    filename="zlibrary_bot.log",
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -19,11 +23,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.message.text.strip().lower()
+    query = update.message.text.strip()
 
     if update.message.chat.type in ["group", "supergroup"]:
         bot_username = (await context.bot.get_me()).username.lower()
-        if f"@{bot_username}" not in query:
+        if f"@{bot_username}" not in query.lower():
             return  # Ignore messages in groups unless the bot is mentioned
 
         query = query.replace(f"@{bot_username}", "").strip()
@@ -55,7 +59,7 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if original_url.startswith("https://z-library.sk/dl/"):
                 logging.debug(f"Following redirect for: {original_url}")
                 try:
-                    response = await context.application.zlib._r(original_url)  # Await response object
+                    response = await context.application.zlib._r_raw(original_url)  # Use _r_raw to get raw response
                     logging.debug(f"Received response status: {response.status}")
 
                     # Extract final URL directly without unnecessary decoding
@@ -71,19 +75,18 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     final_url = original_url  # Fallback to original URL
 
             logging.debug(f"Using final download URL: {final_url}")
-            
             logging.debug(f"Resolved final download URL: {final_url}")
             download_link = final_url
 
             entry = f"{i}. {title}\nAuthor(s): {author_names}\nFormat: {format_type}\nDownload: {download_link}\n\n"
-            
+
             logging.debug(f"DEBUG Entry content: {entry}")
             logging.debug(f"DEBUG Entry length: {len(entry)}")
             logging.debug(f"DEBUG Current reply length: {len(reply)}")
             if len(reply) + len(entry) > max_length or (i % books_per_message == 0):
                 if reply.strip():  # Ensure reply contains valid content
                     messages.append(reply)
-                    print(f"DEBUG: Sending message of length: {len(reply)}")  # Log sent message length
+                    logging.debug(f"DEBUG: Sending message of length: {len(reply)}")  # Log sent message length
                     await update.message.reply_text(reply)  # Send message immediately
                 reply = entry  # Start new buffer with current entry
             else:
@@ -96,6 +99,8 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(reply)
         elif not messages:
             await update.message.reply_text("No results found.")  # Ensure a response is always sent
+    else:
+        await update.message.reply_text("No results found.")  # In case paginator.result is empty
 
 async def zlib_login():
     """Handle the asynchronous login for zlibrary."""
@@ -122,8 +127,7 @@ def main():
     application = ApplicationBuilder().token(telegram_token).build()
 
     # Perform the zlibrary login asynchronously
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    loop = asyncio.get_event_loop()
     zlib = loop.run_until_complete(zlib_login())
 
     if not zlib:
@@ -134,7 +138,7 @@ def main():
 
     # Add handlers
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & (filters.ChatType.GROUP | filters.ChatType.SUPERGROUP), search_books))
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), search_books))
 
     # Run the bot
     print("Bot is running...")

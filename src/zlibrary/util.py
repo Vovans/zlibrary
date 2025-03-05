@@ -8,16 +8,13 @@ from .logger import logger
 from aiohttp.abc import AbstractCookieJar
 from typing import Tuple
 
-
 HEAD = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"
 }
 
-
 TIMEOUT = aiohttp.ClientTimeout(total=180, connect=0, sock_connect=120, sock_read=180)
 
 HEAD_TIMEOUT = aiohttp.ClientTimeout(total=4, connect=0, sock_connect=4, sock_read=4)
-
 
 async def GET_request(url, cookies=None, proxy_list=None) -> str:
     try:
@@ -34,6 +31,20 @@ async def GET_request(url, cookies=None, proxy_list=None) -> str:
     except asyncio.exceptions.CancelledError:
         raise LoopError("Asyncio loop has been closed before request could finish.")
 
+async def GET_request_raw(url, cookies=None, proxy_list=None):
+    try:
+        async with aiohttp.ClientSession(
+            headers=HEAD,
+            cookie_jar=aiohttp.CookieJar(unsafe=True),
+            cookies=cookies,
+            timeout=TIMEOUT,
+            connector=ChainProxyConnector.from_urls(proxy_list) if proxy_list else None,
+        ) as sess:
+            logger.info("GET %s" % url)
+            async with sess.get(url, allow_redirects=True) as resp:
+                return resp  # Return the raw response object without decoding
+    except asyncio.exceptions.CancelledError:
+        raise LoopError("Asyncio loop has been closed before request could finish.")
 
 async def GET_request_cookies(
     url, cookies=None, proxy_list=None
@@ -52,7 +63,6 @@ async def GET_request_cookies(
     except asyncio.exceptions.CancelledError:
         raise LoopError("Asyncio loop has been closed before request could finish.")
 
-
 async def POST_request(url, data, proxy_list=None):
     try:
         async with aiohttp.ClientSession(
@@ -66,7 +76,6 @@ async def POST_request(url, data, proxy_list=None):
                 return (await resp.text(), sess.cookie_jar)
     except asyncio.exceptions.CancelledError:
         raise LoopError("Asyncio loop has been closed before request could finish.")
-
 
 async def HEAD_request(url, proxy_list=None):
     try:

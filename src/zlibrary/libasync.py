@@ -12,12 +12,11 @@ from .exception import (
     NoDomainError,
     NoIdError,
 )
-from .util import GET_request, POST_request, GET_request_cookies
+from .util import GET_request, POST_request, GET_request_cookies, GET_request_raw
 from .abs import SearchPaginator, BookItem
 from .profile import ZlibProfile
 from .const import Extension, Language
 from typing import Optional
-
 
 ZLIB_DOMAIN = "https://z-library.sk/"
 LOGIN_DOMAIN = "https://z-library.sk/rpc.php"
@@ -28,7 +27,6 @@ ZLIB_TOR_DOMAIN = (
 LOGIN_TOR_DOMAIN = (
     "http://loginzlib2vrak5zzpcocc3ouizykn6k5qecgj2tzlnab5wcbqhembyd.onion/rpc.php"
 )
-
 
 class AsyncZlib:
     semaphore = True
@@ -95,6 +93,17 @@ class AsyncZlib:
                 )
         else:
             return await GET_request(
+                url, proxy_list=self.proxy_list, cookies=self.cookies
+            )
+
+    async def _r_raw(self, url: str):
+        if self.semaphore:
+            async with self.__semaphore:
+                return await GET_request_raw(
+                    url, proxy_list=self.proxy_list, cookies=self.cookies
+                )
+        else:
+            return await GET_request_raw(
                 url, proxy_list=self.proxy_list, cookies=self.cookies
             )
 
