@@ -48,10 +48,11 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             author_names = authors[0].get("author", "Unknown") if isinstance(authors, list) and authors else "Unknown Author"
             logging.debug(f"Extracted author names before trimming: {author_names}")           
             format_type = book.get("extension", "Unknown")
+            
             # Verify authentication before retrieving download link
             if not context.application.zlib or not context.application.zlib.cookies:
                 logging.error("Z-Library session is not authenticated! Ensure login credentials are set.")
-            
+
             # Attempt to follow redirect to get final download URL
             original_url = book.get("download_url", "Unavailable")
             final_url = original_url  # Default to original URL if redirect fails
@@ -61,8 +62,8 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try:
                     response = await context.application.zlib._r_raw(original_url)  # Use _r_raw to get raw response
                     logging.debug(f"Received response status: {response.status}")
-
-                    # Extract final URL directly without unnecessary decoding
+                    
+                    # Extract final URL without unnecessary decoding
                     final_url = str(response.url)
 
                     if response.history:  # Check if redirects happened
@@ -78,7 +79,8 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.debug(f"Resolved final download URL: {final_url}")
             download_link = final_url
 
-            entry = f"{i}. {title}\nAuthor(s): {author_names}\nFormat: {format_type}\nDownload: {download_link}\n\n"
+            # Format messages with bold title and clickable download link
+            entry = f"*{i}. {title}*\nAuthor(s): {author_names}\nFormat: {format_type}\n[Download]({download_link})\n\n"
 
             logging.debug(f"DEBUG Entry content: {entry}")
             logging.debug(f"DEBUG Entry length: {len(entry)}")
@@ -87,7 +89,7 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if reply.strip():  # Ensure reply contains valid content
                     messages.append(reply)
                     logging.debug(f"DEBUG: Sending message of length: {len(reply)}")  # Log sent message length
-                    await update.message.reply_text(reply)  # Send message immediately
+                    await update.message.reply_text(reply, parse_mode="Markdown", disable_web_page_preview=True)  # Send message
                 reply = entry  # Start new buffer with current entry
             else:
                 reply += entry  # Add new entry to reply buffer
@@ -96,7 +98,7 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if reply.strip():
             logging.debug(f"Final message being sent: {reply}")
             messages.append(reply)
-            await update.message.reply_text(reply)
+            await update.message.reply_text(reply, parse_mode="Markdown", disable_web_page_preview=True)
         elif not messages:
             await update.message.reply_text("No results found.")  # Ensure a response is always sent
     else:
