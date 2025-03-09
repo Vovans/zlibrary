@@ -42,17 +42,28 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.chat.type in ["group", "supergroup"]:
         bot_username = (await context.bot.get_me()).username.lower()
         if f"@{bot_username}" not in query.lower():
-            return  # Ignore messages in groups unless the bot is mentioned
+            return  # Ignore messages in groups unless bot is mentioned
 
         query = query.replace(f"@{bot_username}", "").strip()
     paginator = await context.application.zlib.search(q=query, count=5)
     await paginator.next()
 
     if paginator.result:
+        # Get download limits info from profile
+        try:
+            limit_info = await context.application.zlib.profile.get_limits()
+            limits_text = (
+                f"Download Limits: Used {limit_info['daily_amount']} / Allowed {limit_info['daily_allowed']}, "
+                f"Remaining {limit_info['daily_remaining']}, Reset at: {limit_info['daily_reset']}\n\n"
+            )
+        except Exception as e:
+            logging.error(f"Failed to retrieve download limits: {e}")
+            limits_text = ""
+
         messages = []
-        reply = ""
+        reply = limits_text  # Prepend limits info to the first message
         max_length = 3000  # Telegram's limit is 4096, leaving margin
-        books_per_message = 3  # Max books in one message
+        books_per_message = 3  # Max books per message
 
         for idx, book_item in enumerate(paginator.result, start=1):
             book = await book_item.fetch()
@@ -60,6 +71,7 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             authors = book.get("authors", [])
             logging.debug(f"Raw authors data: {authors}")
             if isinstance(authors, list) and authors:
+                # Use only first author
                 author_info = authors[0]
                 author_names = author_info.get("author", "Unknown")
             else:
@@ -67,41 +79,34 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.debug(f"Extracted author names: {author_names}")
             format_type = book.get("extension", "Unknown")
             
-            # Verify authentication before retrieving download link
             if not context.application.zlib or not context.application.zlib.cookies:
                 logging.error("Z-Library session is not authenticated! Ensure login credentials are set.")
 
-            # Attempt to follow redirect to get final download URL
             original_url = book.get("download_url", "Unavailable")
-            final_url = original_url  # Default to original URL if redirect fails
+            final_url = original_url  # Fallback if redirect fails
 
             if original_url.startswith("https://z-library.sk/dl/"):
                 logging.debug(f"Following redirect for: {original_url}")
                 try:
                     response = await context.application.zlib._r_raw(original_url)
                     logging.debug(f"Received response status: {response.status}")
-                    
-                    # Extract final URL without decoding content
+                    # Use response.url to get final URL without decoding content
                     final_url = str(response.url)
-
-                    if response.history:  # Check if redirects happened
+                    if response.history:
                         logging.debug(f"Final redirect resolved URL: {final_url}")
                     else:
                         logging.warning(f"No redirects detected; using original URL: {final_url}")
-
                 except Exception as e:
                     logging.error(f"Failed to retrieve final URL: {e}")
-                    final_url = original_url  # Fallback to original URL
+                    final_url = original_url
 
             logging.debug(f"Using final download URL: {final_url}")
             download_link = escape_url(final_url)
 
-            # Escape special characters in title and author names
             safe_title = escape_markdown(title)
             safe_author_names = escape_markdown(author_names)
             safe_format_type = escape_markdown(format_type)
 
-            # Format messages with bold title and clickable download link
             entry = (
                 f"*{idx}\\. {safe_title}*\n"
                 f"Author\\(s\\): {safe_author_names}\n"
@@ -113,23 +118,22 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.debug(f"DEBUG Entry length: {len(entry)}")
             logging.debug(f"DEBUG Current reply length: {len(reply)}")
             if len(reply) + len(entry) > max_length or (idx % books_per_message == 0):
-                if reply.strip():  # Ensure reply contains valid content
+                if reply.strip():
                     messages.append(reply)
-                    logging.debug(f"DEBUG: Sending message of length: {len(reply)}")  # Log sent message length
+                    logging.debug(f"DEBUG: Sending message of length: {len(reply)}")
                     await update.message.reply_text(reply, parse_mode="MarkdownV2", disable_web_page_preview=True)
-                reply = entry  # Start new buffer with current entry
+                reply = entry
             else:
-                reply += entry  # Add new entry to reply buffer
+                reply += entry
 
-        # Ensure last accumulated message is sent
         if reply.strip():
             logging.debug(f"Final message being sent: {reply}")
             messages.append(reply)
             await update.message.reply_text(reply, parse_mode="MarkdownV2", disable_web_page_preview=True)
         elif not messages:
-            await update.message.reply_text("No results found.")  # Ensure a response is always sent
+            await update.message.reply_text("No results found.")
     else:
-        await update.message.reply_text("No results found.")  # In case paginator.result is empty
+        await update.message.reply_text("No results found.")
 
 async def zlib_login():
     """Handle the asynchronous login for zlibrary."""
@@ -152,24 +156,19 @@ def main():
         print("Please set the environment variable TELEGRAM_TOKEN.")
         return
 
-    # Create the Telegram bot application
     application = ApplicationBuilder().token(telegram_token).build()
 
-    # Perform the zlibrary login asynchronously
     loop = asyncio.get_event_loop()
     zlib = loop.run_until_complete(zlib_login())
 
     if not zlib:
         return
 
-    # Store zlib instance in application
     application.zlib = zlib
 
-    # Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), search_books))
 
-    # Run the bot
     print("Bot is running...")
     application.run_polling()
 
