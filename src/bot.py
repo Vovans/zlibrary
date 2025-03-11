@@ -2,13 +2,15 @@ import os
 import asyncio
 import logging
 import re
+import uuid
 from zlibrary import AsyncZlib
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     ContextTypes,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     filters,
 )
 
@@ -60,10 +62,9 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"Failed to retrieve download limits: {e}")
             limits_text = ""
 
-        messages = []
-        reply = limits_text  # Prepend limits info to the first message
-        max_length = 3000  # Telegram's limit is 4096, leaving margin
-        books_per_message = 3  # Max books per message
+        reply = limits_text  # Prepend limits info
+        max_length = 3000  # Leave margin for Telegram (actual limit is 4096)
+        buttons = []  # Collect inline keyboard buttons for each book entry
 
         for idx, book_item in enumerate(paginator.result, start=1):
             book = await book_item.fetch()
@@ -71,37 +72,17 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
             authors = book.get("authors", [])
             logging.debug(f"Raw authors data: {authors}")
             if isinstance(authors, list) and authors:
-                # Use only first author
+                # Use only the first author
                 author_info = authors[0]
                 author_names = author_info.get("author", "Unknown")
             else:
                 author_names = "Unknown Author"
             logging.debug(f"Extracted author names: {author_names}")
             format_type = book.get("extension", "Unknown")
-            
-            if not context.application.zlib or not context.application.zlib.cookies:
-                logging.error("Z-Library session is not authenticated! Ensure login credentials are set.")
 
             original_url = book.get("download_url", "Unavailable")
-            final_url = original_url  # Fallback if redirect fails
-
-            if original_url.startswith("https://z-library.sk/dl/"):
-                logging.debug(f"Following redirect for: {original_url}")
-                try:
-                    response = await context.application.zlib._r_raw(original_url)
-                    logging.debug(f"Received response status: {response.status}")
-                    # Use response.url to get final URL without decoding content
-                    final_url = str(response.url)
-                    if response.history:
-                        logging.debug(f"Final redirect resolved URL: {final_url}")
-                    else:
-                        logging.warning(f"No redirects detected; using original URL: {final_url}")
-                except Exception as e:
-                    logging.error(f"Failed to retrieve final URL: {e}")
-                    final_url = original_url
-
-            logging.debug(f"Using final download URL: {final_url}")
-            download_link = escape_url(final_url)
+            # Do not resolve the link now; we will resolve it upon button click.
+            final_url = original_url
 
             safe_title = escape_markdown(title)
             safe_author_names = escape_markdown(author_names)
@@ -111,29 +92,59 @@ async def search_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"*{idx}\\. {safe_title}*\n"
                 f"Author\\(s\\): {safe_author_names}\n"
                 f"Format: {safe_format_type}\n"
-                f"[Download]({download_link})\n\n"
             )
-
-            logging.debug(f"DEBUG Entry content: {entry}")
-            logging.debug(f"DEBUG Entry length: {len(entry)}")
-            logging.debug(f"DEBUG Current reply length: {len(reply)}")
-            if len(reply) + len(entry) > max_length or (idx % books_per_message == 0):
+            # Append the entry text to reply
+            if len(reply) + len(entry) > max_length:
                 if reply.strip():
-                    messages.append(reply)
-                    logging.debug(f"DEBUG: Sending message of length: {len(reply)}")
                     await update.message.reply_text(reply, parse_mode="MarkdownV2", disable_web_page_preview=True)
                 reply = entry
             else:
                 reply += entry
 
-        if reply.strip():
-            logging.debug(f"Final message being sent: {reply}")
-            messages.append(reply)
-            await update.message.reply_text(reply, parse_mode="MarkdownV2", disable_web_page_preview=True)
-        elif not messages:
-            await update.message.reply_text("No results found.")
+            # Generate a unique token and store the original_url in the mapping for later resolution.
+            token = uuid.uuid4().hex
+            if not hasattr(context.application, "link_mapping"):
+                context.application.link_mapping = {}
+            context.application.link_mapping[token] = original_url
+
+            # Create an inline keyboard button for resolving the download link.
+            button = InlineKeyboardButton(f"Show link for {idx}", callback_data=f"show_link:{token}")
+            buttons.append([button])  # Each button in its own row
+
+            reply += "\n"  # Add extra newline after entry
+
+        # Send the search results message with inline keyboard buttons if any.
+        await update.message.reply_text(reply, parse_mode="MarkdownV2", disable_web_page_preview=True, reply_markup=InlineKeyboardMarkup(buttons))
     else:
         await update.message.reply_text("No results found.")
+
+async def resolve_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback handler for 'Show link' button; resolves the original download URL."""
+    query = update.callback_query
+    await query.answer()  # Acknowledge callback
+    data = query.data  # Expected format: "show_link:<token>"
+    try:
+        token = data.split(":", 1)[1]
+    except IndexError:
+        await query.edit_message_text("Invalid callback data.")
+        return
+
+    original_url = context.application.link_mapping.get(token)
+    if not original_url:
+        await query.edit_message_text("Link not found or expired.")
+        return
+
+    try:
+        response = await context.application.zlib._r_raw(original_url)
+        final_url = str(response.url)
+        # Remove the token from the mapping once used.
+        context.application.link_mapping.pop(token, None)
+        safe_final_url = escape_url(final_url)
+        message_text = f"Resolved Download Link: [Download]({safe_final_url})"
+        await query.edit_message_text(message_text, parse_mode="MarkdownV2", disable_web_page_preview=True)
+    except Exception as e:
+        logging.error(f"Failed to resolve link for token {token}: {e}")
+        await query.edit_message_text("Failed to resolve the download link.")
 
 async def zlib_login():
     """Handle the asynchronous login for zlibrary."""
@@ -157,6 +168,8 @@ def main():
         return
 
     application = ApplicationBuilder().token(telegram_token).build()
+    # Initialize global mapping for link resolution.
+    application.link_mapping = {}
 
     loop = asyncio.get_event_loop()
     zlib = loop.run_until_complete(zlib_login())
@@ -168,6 +181,7 @@ def main():
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), search_books))
+    application.add_handler(CallbackQueryHandler(resolve_link, pattern=r"^show_link:"))
 
     print("Bot is running...")
     application.run_polling()
